@@ -21,22 +21,154 @@ player = Player("Name", world.startingRoom)
 
 
 # FILL THIS IN
-traversalPath = ['n', 's']
+traversalPath = ['n', 'n']
 
+# Stores a set() of all the rooms, across ALL "trips", that have been visited.
+# A trip ends when you hit a dead end
+visited_total = set()
+
+# Key = Room, Value = Room's exits
+rooms_storage = {}
+
+# TRAVERSAL WORK
+
+# Adds the player's current room to a list of total rooms that
+# have been visited, across all trips
+def add_visited(graph, current_room):
+    # If the room the player is currently in hasn't been visited before
+    if current_room.id not in graph:
+        # Add the current room to our graph dict with the id as the key and the value being
+        # The available rooms with their id as the key and value '#' if there is an exit
+        # We do this by just iterating through the exits using getExits
+        graph[current_room.id] = {i: '#' for i in current_room.getExits()}
+        # Add new room to our visited total set so we can record that we've gone here
+        visited_total.add(current_room.id)
+
+# Returns the opposite direction of the input given
+def reflect_direction(dir):
+    if dir == "n":
+        return "s"
+    elif dir == "s":
+        return "n"
+    elif dir == "e":
+        return "w"
+    elif dir == "w":
+        return "e"
+
+# Helper function to check if exit exists
+def checkExit(exit):
+    if exit == "#":
+        return True
+    else:
+        return False
+
+# Finds target nearest room with exit available
+def closest_target_room(graph, start_id):
+    # Checks each available exit at the player's current room
+    for exit in graph[start_id]:
+        # If an unexplored exit is available at our starting room
+        if checkExit(graph[start_id][exit]):
+            return None
+
+    # If we don't have an unexplored exit to go to
+    # We create a queue so that the player can traverse backwards through stored paths to find a room
+    # with an '#' exit. (# means a room id hasn't been mapped for it yet)
+    # Breadth-first solution
+    q = []
+    # We start out with a path with our starting_id
+    q.append([start_id])
+    visited_trip = set()
+    # Runs while queue isn't empty
+    while len(q) > 0:
+        # Pop first path and store it in variable
+        path = q.pop(0)
+        # Grab our most recent room from the path like we've done this week
+        current_room = path[-1]
+        # If room is unique
+        if current_room not in visited_trip:
+            # Add it to our set
+            visited_trip.add(current_room)
+            # Checks for any available exits at the current room...
+            for exit in graph[current_room]:
+                # If the room has a unique exit that hasn't been passed
+                if checkExit(graph[current_room][exit]):
+                    # return our path to the room
+                    return path
+            # Iterate through each exit in the current room
+            for exit_neighbor in graph[current_room]:
+                # Make a copy of our path that we've gone through to get to current room
+                newPath = path.copy()
+                # Get the room id of the current iterated exit that the player could go to
+                exit_room = graph[current_room][exit_neighbor]
+                # Add the room to our copied path
+                newPath.append(exit_room)
+                # queue the new possible path
+                q.append(newPath)
+
+# While there aren't as many rooms in our room storage as the map
+while len(roomGraph) != len(rooms_storage):
+    current_room_id = player.currentRoom.id
+    # Add current room
+    add_visited(rooms_storage, player.currentRoom)
+    # Iterate through our current room's exits
+    for exit in rooms_storage[current_room_id]:
+        # Check to see if the exit has a value of "#"
+        if checkExit(rooms_storage[current_room_id][exit]):
+            # Add this exit to our traversalPath
+            traversalPath.append(exit)
+            # Move the player to that exit, so they follows the traversalPath
+            player.travel(exit)
+            # Add the room we just moved from as we have traveled from it
+            add_visited(rooms_storage, player.currentRoom)
+            # Grab the id of the room we just moved to
+            new_room_id = player.currentRoom.id    
+            # Get the opposite direction of the exit we just came from
+            opposite_direction = reflect_direction(exit)
+            # Set our previous rooms exit that we came from value equal to the room we moved to,
+            # This way we're mapping it out in our storage
+            rooms_storage[current_room_id][exit] = new_room_id
+            # Set the room we've just moved to opposite exit direction to our previous room id
+            # These 2 lines we've just done have now created 'edges' of sorts by connecting themselves
+            rooms_storage[new_room_id][opposite_direction] = current_room_id
+            # Set the current room id equal to the new room we've moved to, and iterate more!
+            current_room_id = new_room_id
+            break  
+        
+    # We use our closest_target_room function to find the shortest path we can take,
+    # to the nearest room with an unexplored exit and store our path we get from our function
+    # path_to_unexplored will be None if there is an unexplored exit
+    path = closest_target_room(rooms_storage, player.currentRoom.id)
+    # If the current path has no unexplored paths available
+    if path is not None:
+        # Iterate through our path we got back from the func
+        for room_id in path:
+            # For each of these rooms, iterate through it's exits
+            for available_exit in rooms_storage[current_room_id]:
+                # If the value of our current exit is equal to the current iteration of room_id 
+                if rooms_storage[current_room_id][available_exit] == room_id:
+                    # Add that direction to our traversalPath
+                    traversalPath.append(available_exit)
+                    # And move the player in that direction
+                    player.travel(available_exit)
+
+# If we've visited every single room then we know we've finished
+if len(visited_total) == len(roomGraph):
+    print('Tests passed succesfully!')
+    print(f"Total Moves Made: {len(traversalPath)} moves")
+    print(f"Total Rooms Visited: {len(visited_total)} rooms\n")
 
 # TRAVERSAL TEST
-visited_rooms = set()
-player.currentRoom = world.startingRoom
-visited_rooms.add(player.currentRoom)
-for move in traversalPath:
-    player.travel(move)
-    visited_rooms.add(player.currentRoom)
-
-if len(visited_rooms) == len(roomGraph):
-    print(f"TESTS PASSED: {len(traversalPath)} moves, {len(visited_rooms)} rooms visited")
-else:
-    print("TESTS FAILED: INCOMPLETE TRAVERSAL")
-    print(f"{len(roomGraph) - len(visited_rooms)} unvisited rooms")
+# visited_rooms = set()
+# player.currentRoom = world.startingRoom
+# visited_rooms.add(player.currentRoom)
+# for move in traversalPath:
+#     player.travel(move)
+#     visited_rooms.add(player.currentRoom)
+# if len(visited_rooms) == len(roomGraph):
+#     print(f"TESTS PASSED: {len(traversalPath)} moves, {len(visited_rooms)} rooms visited")
+# else:
+#     print("TESTS FAILED: INCOMPLETE TRAVERSAL")
+#     print(f"{len(roomGraph) - len(visited_rooms)} unvisited rooms")
 
 
 
